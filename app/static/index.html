@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Homework Buddy</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+    <header class="app-header">
+        <div class="logo-area">
+            <h1>🧠 Homework Buddy</h1>
+            <p class="subtitle">Best Brains Math & English Worksheet Checker</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-sound-toggle" id="btnSoundToggle" onclick="toggleSound()">🔊 Sound ON</button>
+            <button class="btn-parent-toggle" onclick="toggleParentModal()">⚙️ Parent Zone</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="profile-selection">
+            <p class="instruction">Choose your name to check today's Best Brains pages!</p>
+            <div class="profile-cards">
+                <div class="profile-card" id="card-Krisha" onclick="selectProfile('Krisha', '3rd Grade', this)">
+                    <div class="avatar">👧</div>
+                    <h2>Krisha</h2>
+                    <span class="grade-badge">3rd Grade</span>
+                    <div class="stats-row">
+                        <div class="stat-pill">
+                            <span class="stat-label">Points</span>
+                            <span class="stat-val" id="pts-Krisha">...</span>
+                        </div>
+                        <div class="stat-pill">
+                            <span class="stat-label">Streak</span>
+                            <span class="stat-val" id="streak-Krisha">🔥 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-card" id="card-Vedant" onclick="selectProfile('Vedant', 'Kindergarten', this)">
+                    <div class="avatar">👦</div>
+                    <h2>Vedant</h2>
+                    <span class="grade-badge">Kindergarten</span>
+                    <div class="stats-row">
+                        <div class="stat-pill">
+                            <span class="stat-label">Points</span>
+                            <span class="stat-val" id="pts-Vedant">...</span>
+                        </div>
+                        <div class="stat-pill">
+                            <span class="stat-label">Streak</span>
+                            <span class="stat-val" id="streak-Vedant">🔥 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action / Camera Zone -->
+        <section class="action-zone" id="actionZone">
+            <div class="active-banner" id="activeBanner">
+                Checking work for: <strong id="selectedNameDisplay"></strong>
+            </div>
+
+            <button class="btn btn-scan" onclick="document.getElementById('cameraInput').click()">
+                📸 Scan Homework Page
+            </button>
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="onFileSelected()">
+
+            <!-- Preview thumbnail -->
+            <div id="imagePreviewContainer" class="preview-container" style="display: none;">
+                <img id="imagePreview" alt="Worksheet Preview" class="preview-img">
+                <div class="preview-actions">
+                    <button class="btn btn-confirm" id="btnSubmitGrade" onclick="uploadAndGrade()">✨ Check My Work!</button>
+                    <button class="btn btn-secondary" onclick="rotatePreview()" type="button">🔄 Rotate</button>
+                    <button class="btn btn-secondary" onclick="resetScan()">Retake</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loadingZone" class="loading-zone" style="display: none;">
+            <div class="spinner"></div>
+            <h3>✨ Checking your Best Brains page...</h3>
+            <p>Our smart AI is reading your handwriting and calculations. Hold tight!</p>
+        </div>
+
+        <!-- Feedback & Results -->
+        <section id="feedbackZone" class="feedback-zone" style="display: none;">
+            <div id="feedbackCard" class="result-card"></div>
+
+            <!-- Funny Teacher Voice Chat Section (Phase 2) -->
+            <div id="teacherChatCard" class="teacher-chat-card" style="display: none;">
+                <div class="teacher-header">
+                    <div class="teacher-avatar">🦉</div>
+                    <div>
+                        <h3>Professor Sunny</h3>
+                        <span class="teacher-tagline">Your Funny Best Brains Tutor</span>
+                    </div>
+                </div>
+
+                <div class="chat-speech-bubble" id="teacherSpeechBubble">
+                    "Hey there! Got questions about this worksheet or want a funny fact? Tap the mic or pick a question below!"
+                </div>
+
+                <div class="chat-chips">
+                    <button class="chip" onclick="askTeacherQuick('Can you explain this page in a funny way?')">💡 Explain this page</button>
+                    <button class="chip" onclick="askTeacherQuick('Why was my answer wrong? Help me understand!')">🔍 Explain my mistake</button>
+                    <button class="chip" onclick="askTeacherQuick('Tell me a hilarious random fact!')">🐙 Funny random fact</button>
+                    <button class="chip" onclick="askTeacherQuick('Tell me a whimsical mini-story about this homework!')">📖 Whimsical story</button>
+                </div>
+
+                <div class="chat-controls">
+                    <button class="btn-mic" id="btnVoiceMic" onclick="toggleVoiceRecording()">
+                        <span id="micIcon">🎙️</span> <span id="micLabel">Tap to Talk</span>
+                    </button>
+                    <div class="chat-input-row">
+                        <input type="text" id="teacherTextInput" placeholder="Or type a question..." onkeydown="if(event.key==='Enter') sendTeacherMessage()">
+                        <button class="btn-send-chat" onclick="sendTeacherMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Parent Admin Modal -->
+    <div id="parentModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Parent Dashboard & Points Adjustment</h2>
+                <button class="close-btn" onclick="toggleParentModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="parent-links">
+                    <a href="http://localhost:8081" target="_blank" class="adminer-link">
+                        🗄️ Open Database in Adminer (Port 8081)
+                    </a>
+                </div>
+
+                <h3>Quick Adjust Points</h3>
+                <div class="adjust-grid">
+                    <div class="adjust-col">
+                        <h4>👧 Krisha</h4>
+                        <div class="quick-btns">
+                            <button class="btn-sm btn-add" onclick="adjustPoints('Krisha', 5)">+5 Pts</button>
+                            <button class="btn-sm btn-add" onclick="adjustPoints('Krisha', 10)">+10 Pts</button>
+                            <button class="btn-sm btn-sub" onclick="adjustPoints('Krisha', -5)">-5 Pts</button>
+                            <button class="btn-sm btn-sub" onclick="adjustPoints('Krisha', -10)">-10 Pts</button>
+                        </div>
+                    </div>
+                    <div class="adjust-col">
+                        <h4>👦 Vedant</h4>
+                        <div class="quick-btns">
+                            <button class="btn-sm btn-add" onclick="adjustPoints('Vedant', 5)">+5 Pts</button>
+                            <button class="btn-sm btn-add" onclick="adjustPoints('Vedant', 10)">+10 Pts</button>
+                            <button class="btn-sm btn-sub" onclick="adjustPoints('Vedant', -5)">-5 Pts</button>
+                            <button class="btn-sm btn-sub" onclick="adjustPoints('Vedant', -10)">-10 Pts</button>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Recent Submissions</h3>
+                <div class="table-wrapper">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Child</th>
+                                <th>Page ID</th>
+                                <th>Status</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr><td colspan="5">Loading history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="danger-zone">
+                    <h4>⚠️ Danger Zone</h4>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Done testing? Reset all points, streaks, and submission records back to 0 so the kids start fresh.</p>
+                    <button class="btn-wipe" onclick="resetAllData()">🗑️ Reset All Data to 0 (Fresh Start)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

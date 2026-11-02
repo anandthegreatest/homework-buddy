@@ -1,0 +1,59 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homework-buddy-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://homework:homeworkpass@db:5432/homework_buddy
+      - LM_STUDIO_URL=http://host.docker.internal:1234/v1/chat/completions
+      - LM_STUDIO_MODEL=auto
+      - KOKORO_TTS_URL=http://tts:8880/v1/audio/speech
+      - KOKORO_VOICE=af_heart
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: homework-buddy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: homework
+      POSTGRES_PASSWORD: homeworkpass
+      POSTGRES_DB: homework_buddy
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homework -d homework_buddy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: homework-buddy-adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: homework-buddy-tts
+    restart: unless-stopped
+    ports:
+      - "8880:8880"
+
+volumes:
+  postgres_data:
