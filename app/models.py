@@ -14,6 +14,7 @@ class ChildProfile(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     submissions = relationship("SubmissionHistory", back_populates="child", cascade="all, delete-orphan")
+    books = relationship("BookRead", back_populates="child", cascade="all, delete-orphan")
 
 class SubmissionHistory(Base):
     __tablename__ = "submission_history"
@@ -29,3 +30,20 @@ class SubmissionHistory(Base):
     submitted_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     child = relationship("ChildProfile", back_populates="submissions")
+
+class BookRead(Base):
+    __tablename__ = "books_read"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    child_name = Column(String(50), ForeignKey("child_profiles.name"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    author = Column(String(100), nullable=True)
+    isbn = Column(String(50), nullable=True)
+    question_asked = Column(Text, nullable=True)
+    child_answer = Column(Text, nullable=True)
+    feedback = Column(Text, nullable=True)
+    points_awarded = Column(Integer, default=15, nullable=False)
+    passed = Column(Boolean, default=True, nullable=False)
+    completed_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    child = relationship("ChildProfile", back_populates="books")

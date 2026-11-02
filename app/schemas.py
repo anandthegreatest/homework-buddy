@@ -60,3 +60,41 @@ class TeacherChatRequest(BaseModel):
 class TeacherChatResponse(BaseModel):
     reply: str
     audio_url: str
+
+class BookScanResponse(BaseModel):
+    title: str
+    author: Optional[str] = "Unknown"
+    isbn: Optional[str] = None
+    question: str
+    message: str
+    audio_url: Optional[str] = None
+    already_read: bool = False
+
+class BookVerifyRequest(BaseModel):
+    child_name: str
+    grade_level: str
+    title: str
+    author: Optional[str] = None
+    isbn: Optional[str] = None
+    question: str
+    child_answer: str
+
+class BookVerifyResponse(BaseModel):
+    passed: bool
+    title: str
+    points_earned: int
+    current_total_points: int
+    feedback: str
+    message: str
+    audio_url: Optional[str] = None
+
+class BookReadItem(BaseModel):
+    id: int
+    title: str
+    author: Optional[str] = None
+    isbn: Optional[str] = None
+    points_awarded: int
+    completed_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine, Base, get_db
-from app.models import ChildProfile, SubmissionHistory
+from app.models import ChildProfile, SubmissionHistory, BookRead
 from app.schemas import (
     ProfileResponse,
     AdjustPointsRequest,
@@ -22,9 +22,14 @@ from app.schemas import (
     SubmissionItemResponse,
     TeacherChatRequest,
     TeacherChatResponse,
+    BookScanResponse,
+    BookVerifyRequest,
+    BookVerifyResponse,
+    BookReadItem,
 )
 from app.services.grading_service import evaluate_and_grade_submission
 from app.services.teacher_chat_service import chat_with_teacher
+from app.services.book_service import scan_and_question_book, verify_book_comprehension, get_child_bookshelf
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -268,6 +273,61 @@ async def teacher_voice_chat(payload: TeacherChatRequest):
     import urllib.parse
     audio_url = f"/api/v1/tts?text={urllib.parse.quote(reply)}"
     return {"reply": reply, "audio_url": audio_url}
+
+@app.post("/api/v1/books/scan", response_model=BookScanResponse)
+async def scan_book_endpoint(
+    name: str = Form(...),
+    gradeLevel: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Scans a book cover or ISBN/barcode and generates a targeted comprehension question.
+    """
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    
+    base64_img = base64.b64encode(contents).decode("utf-8")
+    mime_type = file.content_type or "image/jpeg"
+
+    try:
+        result = await scan_and_question_book(
+            db=db,
+            child_name=name,
+            grade_level=gradeLevel,
+            base64_image=base64_img,
+            mime_type=mime_type
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Book scan error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/books/verify", response_model=BookVerifyResponse)
+async def verify_book_endpoint(
+    payload: BookVerifyRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Evaluates child's answer to the book comprehension question and awards Reading Star points.
+    """
+    try:
+        result = await verify_book_comprehension(db=db, payload=payload)
+        return result
+    except Exception as e:
+        logger.error(f"Book verify error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/books/shelf/{child_name}", response_model=List[BookReadItem])
+async def get_bookshelf_endpoint(
+    child_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Fetches the virtual bookshelf of completed books for the child.
+    """
+    return get_child_bookshelf(db=db, child_name=child_name)
 
 # Mount static frontend
 app.mount("/", StaticFiles(directory="app/static", html=True), name="static")

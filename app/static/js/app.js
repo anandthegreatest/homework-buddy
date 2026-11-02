@@ -9,6 +9,10 @@ let lastEvaluationText = "";
 let teacherChatHistory = [];
 let recognition = null;
 let isRecording = false;
+let currentMode = "worksheet"; // "worksheet" or "book"
+let currentBookData = null;
+let bookRecognition = null;
+let isBookRecording = false;
 const SERVER_URL = window.location.origin;
 
 // Initialize Web Audio Context on user interaction (required by mobile browsers)
@@ -285,6 +289,52 @@ async function fetchPoints() {
     });
 }
 
+function switchMode(mode) {
+    currentMode = mode;
+    initAudioContext();
+    playCoinSound(1700, 0.05);
+
+    const tabWs = document.getElementById('tabWorksheet');
+    const tabBk = document.getElementById('tabBook');
+    const btnScan = document.getElementById('btnScanPrompt');
+    const btnSubmit = document.getElementById('btnSubmitGrade');
+    const fbZone = document.getElementById('feedbackZone');
+    const teacherCard = document.getElementById('teacherChatCard');
+    const quizZone = document.getElementById('bookQuizZone');
+    const resultZone = document.getElementById('bookResultZone');
+    const shelfZone = document.getElementById('bookshelfZone');
+
+    stopSpeech();
+    resetScan();
+
+    if (fbZone) fbZone.style.display = 'none';
+    if (teacherCard) teacherCard.style.display = 'none';
+    if (quizZone) quizZone.style.display = 'none';
+    if (resultZone) resultZone.style.display = 'none';
+
+    if (mode === 'book') {
+        if (tabBk) tabBk.classList.add('active');
+        if (tabWs) tabWs.classList.remove('active');
+        if (btnScan) btnScan.innerText = "📖 Scan Book Cover or Barcode";
+        if (btnSubmit) btnSubmit.innerText = "📖 Ask Book Question!";
+        loadChildBookshelf(activeName);
+    } else {
+        if (tabWs) tabWs.classList.add('active');
+        if (tabBk) tabBk.classList.remove('active');
+        if (btnScan) btnScan.innerText = "📸 Scan Homework Page";
+        if (btnSubmit) btnSubmit.innerText = "✨ Check My Work!";
+        if (shelfZone) shelfZone.style.display = 'none';
+    }
+}
+
+function handleSubmitAction() {
+    if (currentMode === 'book') {
+        scanAndQuizBook();
+    } else {
+        uploadAndGrade();
+    }
+}
+
 function selectProfile(name, grade, element) {
     activeName = name;
     activeGrade = grade;
@@ -295,12 +345,26 @@ function selectProfile(name, grade, element) {
     element.classList.add('selected');
 
     document.getElementById('selectedNameDisplay').innerText = `${name} (${grade})`;
+    
+    // Show mode tabs
+    const modeTabs = document.getElementById('modeTabs');
+    if (modeTabs) modeTabs.style.display = 'flex';
+
     document.getElementById('actionZone').style.display = 'block';
     document.getElementById('feedbackZone').style.display = 'none';
     const teacherCard = document.getElementById('teacherChatCard');
     if (teacherCard) teacherCard.style.display = 'none';
+    const quizZone = document.getElementById('bookQuizZone');
+    if (quizZone) quizZone.style.display = 'none';
+    const resultZone = document.getElementById('bookResultZone');
+    if (resultZone) resultZone.style.display = 'none';
+
     stopSpeech();
     resetScan();
+
+    if (currentMode === 'book') {
+        loadChildBookshelf(name);
+    }
 }
 
 function onFileSelected() {
@@ -746,6 +810,312 @@ async function loadSubmissionsHistory() {
         }).join('');
     } catch (e) {
         tbody.innerHTML = '<tr><td colspan="5">Could not load history.</td></tr>';
+    }
+}
+
+// --- Bookworm Club (Phase 3) ---
+async function scanAndQuizBook() {
+    if (!selectedFile) return;
+
+    initAudioContext();
+    stopSpeech();
+    
+    const loadTitle = document.getElementById('loadingTitle');
+    const loadText = document.getElementById('loadingText');
+    if (loadTitle) loadTitle.innerText = "✨ Inspecting your book...";
+    if (loadText) loadText.innerText = "Our smart reading tutor is reading the title and formulating a fun question!";
+    
+    document.getElementById('loadingZone').style.display = 'block';
+    const quizZone = document.getElementById('bookQuizZone');
+    const resultZone = document.getElementById('bookResultZone');
+    if (quizZone) quizZone.style.display = 'none';
+    if (resultZone) resultZone.style.display = 'none';
+
+    document.getElementById('btnSubmitGrade').disabled = true;
+    document.getElementById('loadingZone').scrollIntoView({ behavior: 'smooth' });
+
+    const formData = new FormData();
+    formData.append("name", activeName);
+    formData.append("gradeLevel", activeGrade);
+    formData.append("file", selectedFile);
+
+    try {
+        const response = await fetch(`${SERVER_URL}/api/v1/books/scan`, {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await response.json();
+        document.getElementById('loadingZone').style.display = 'none';
+        document.getElementById('btnSubmitGrade').disabled = false;
+
+        if (!response.ok) {
+            throw new Error(result.detail || "Server error while inspecting book.");
+        }
+
+        renderBookQuiz(result);
+    } catch (e) {
+        document.getElementById('loadingZone').style.display = 'none';
+        document.getElementById('btnSubmitGrade').disabled = false;
+        alert("Error during book scan: " + e.message);
+    }
+}
+
+function renderBookQuiz(data) {
+    currentBookData = data;
+    const titleEl = document.getElementById('bookTitleDisplay');
+    const authorEl = document.getElementById('bookAuthorDisplay');
+    const readBadge = document.getElementById('bookAlreadyReadBadge');
+    const bubble = document.getElementById('bookQuestionBubble');
+    const input = document.getElementById('bookAnswerInput');
+
+    if (titleEl) titleEl.innerText = data.title;
+    if (authorEl) authorEl.innerText = data.author ? `by ${data.author}` : "";
+    if (readBadge) readBadge.style.display = data.already_read ? 'inline-block' : 'none';
+    if (bubble) bubble.innerText = `"${data.question}"`;
+    if (input) input.value = "";
+
+    const quizZone = document.getElementById('bookQuizZone');
+    if (quizZone) {
+        quizZone.style.display = 'block';
+        quizZone.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    if (soundEnabled) {
+        playNeuralVoice(data.message || data.question);
+    }
+}
+
+async function submitBookAnswer() {
+    if (!currentBookData) return;
+    const input = document.getElementById('bookAnswerInput');
+    const answer = input ? input.value.trim() : "";
+    if (!answer) {
+        alert("Please speak or type your answer!");
+        return;
+    }
+
+    initAudioContext();
+    stopSpeech();
+
+    const submitBtn = document.getElementById('btnSubmitBookAnswer');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${SERVER_URL}/api/v1/books/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                child_name: activeName,
+                grade_level: activeGrade,
+                title: currentBookData.title,
+                author: currentBookData.author,
+                isbn: currentBookData.isbn,
+                question: currentBookData.question,
+                child_answer: answer
+            })
+        });
+
+        const result = await response.json();
+        if (submitBtn) submitBtn.disabled = false;
+
+        if (!response.ok) {
+            throw new Error(result.detail || "Server error verifying answer.");
+        }
+
+        renderBookResult(result);
+        fetchPoints();
+        loadChildBookshelf(activeName);
+    } catch (e) {
+        if (submitBtn) submitBtn.disabled = false;
+        alert("Error submitting answer: " + e.message);
+    }
+}
+
+function renderBookResult(result) {
+    const zone = document.getElementById('bookResultZone');
+    const card = document.getElementById('bookResultCard');
+    if (!zone || !card) return;
+
+    zone.style.display = 'block';
+
+    if (result.passed) {
+        card.innerHTML = `
+            <div style="margin-bottom: 8px;">
+                <span class="result-tag tag-page">📖 ${result.title}</span>
+                <span class="result-tag tag-handwriting">⭐ Mastered!</span>
+            </div>
+            <h2 style="color: #27ae60;">🎉 Reading Star Achieved!</h2>
+            <div class="points-banner">
+                <div class="pts-highlight">+${result.points_earned}</div>
+                <div>
+                    <div><strong>Reading Points Earned!</strong></div>
+                    <div style="font-size: 13px; color: #555;">Added to your Virtual Bookshelf! 📚</div>
+                </div>
+            </div>
+            <div class="explanation-box">
+                <strong>Professor Sunny's Review:</strong><br>
+                ${result.feedback}
+            </div>
+            <div class="result-action-bar">
+                <button class="btn-scan-next" onclick="resetBookFlow()">
+                    📖 Scan Another Book
+                </button>
+            </div>
+        `;
+        playCasinoJackpot();
+        launchConfetti();
+    } else {
+        card.innerHTML = `
+            <div style="margin-bottom: 8px;">
+                <span class="result-tag tag-page">📖 ${result.title}</span>
+            </div>
+            <h2 style="color: #e67e22;">💡 Almost There!</h2>
+            <div class="points-banner" style="background: #fffbeb; border-color: #fde68a;">
+                <div class="pts-highlight" style="color: #d97706;">0</div>
+                <div>
+                    <div><strong>Give It Another Shot!</strong></div>
+                    <div style="font-size: 13px; color: #555;">Listen to Professor Sunny's hint and try again!</div>
+                </div>
+            </div>
+            <div class="explanation-box">
+                <strong>Professor Sunny's Hint:</strong><br>
+                ${result.feedback}
+            </div>
+            <div class="result-action-bar">
+                <button class="btn-voice-replay" onclick="document.getElementById('bookQuizZone').scrollIntoView({ behavior: 'smooth' })">
+                    🔄 Try Answering Again
+                </button>
+            </div>
+        `;
+        playSoftEncouragement();
+    }
+
+    if (soundEnabled) {
+        playNeuralVoice(result.feedback);
+    }
+    zone.scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetBookFlow() {
+    stopSpeech();
+    resetScan();
+    const quizZone = document.getElementById('bookQuizZone');
+    const resultZone = document.getElementById('bookResultZone');
+    if (quizZone) quizZone.style.display = 'none';
+    if (resultZone) resultZone.style.display = 'none';
+
+    const actionZone = document.getElementById('actionZone');
+    if (actionZone) actionZone.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+        document.getElementById('cameraInput').click();
+    }, 450);
+}
+
+async function loadChildBookshelf(childName) {
+    if (!childName) return;
+    const shelfZone = document.getElementById('bookshelfZone');
+    const shelfName = document.getElementById('shelfChildName');
+    const badge = document.getElementById('booksCountBadge');
+    const grid = document.getElementById('shelfGrid');
+
+    if (shelfName) shelfName.innerText = childName;
+    if (shelfZone) shelfZone.style.display = 'block';
+
+    try {
+        const res = await fetch(`${SERVER_URL}/api/v1/books/shelf/${childName}`);
+        if (!res.ok) return;
+        const books = await res.json();
+        if (badge) badge.innerText = `${books.length} book${books.length === 1 ? '' : 's'} read`;
+
+        if (!grid) return;
+        if (books.length === 0) {
+            grid.innerHTML = `<div class="shelf-empty-msg">No books conquered yet. Scan a library book above to earn your first Reading Star! ⭐</div>`;
+            return;
+        }
+
+        grid.innerHTML = books.map((b, idx) => `
+            <div class="book-badge-card color-${idx % 5}">
+                <div class="badge-book-title">${b.title}</div>
+                <div class="badge-book-author">${b.author || 'Children’s Library'}</div>
+                <div class="badge-book-pts">🌟 +${b.points_awarded} pts</div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.warn("Could not load bookshelf:", e);
+    }
+}
+
+// Book Speech Recognition
+function initBookSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = 'en-US';
+
+    rec.onstart = () => {
+        isBookRecording = true;
+        updateBookMicUI(true);
+    };
+
+    rec.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const input = document.getElementById('bookAnswerInput');
+        if (input) input.value = transcript;
+        submitBookAnswer();
+    };
+
+    rec.onerror = () => {
+        isBookRecording = false;
+        updateBookMicUI(false);
+    };
+
+    rec.onend = () => {
+        isBookRecording = false;
+        updateBookMicUI(false);
+    };
+
+    return rec;
+}
+
+function updateBookMicUI(recording) {
+    const micBtn = document.getElementById('btnBookMic');
+    const micIcon = document.getElementById('bookMicIcon');
+    const micLabel = document.getElementById('bookMicLabel');
+    if (!micBtn) return;
+
+    if (recording) {
+        micBtn.classList.add('recording');
+        if (micIcon) micIcon.innerText = "🛑";
+        if (micLabel) micLabel.innerText = "Listening...";
+    } else {
+        micBtn.classList.remove('recording');
+        if (micIcon) micIcon.innerText = "🎙️";
+        if (micLabel) micLabel.innerText = "Tap to Answer";
+    }
+}
+
+function toggleBookVoiceRecording() {
+    stopSpeech();
+    if (!bookRecognition) {
+        bookRecognition = initBookSpeechRecognition();
+        if (!bookRecognition) {
+            alert("Speech recognition isn't supported on this browser. You can type your answer in the box below!");
+            return;
+        }
+    }
+
+    if (isBookRecording) {
+        bookRecognition.stop();
+    } else {
+        try {
+            bookRecognition.start();
+        } catch (e) {
+            console.warn("Book recognition start error:", e);
+        }
     }
 }
 

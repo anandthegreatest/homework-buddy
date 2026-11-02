@@ -55,6 +55,16 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Mode Selector: Worksheets vs Bookworm Club -->
+            <div class="mode-tabs" id="modeTabs" style="display: none;">
+                <button class="mode-tab active" id="tabWorksheet" onclick="switchMode('worksheet')">
+                    📝 Worksheets
+                </button>
+                <button class="mode-tab" id="tabBook" onclick="switchMode('book')">
+                    📚 Bookworm Club
+                </button>
+            </div>
         </section>
 
         <!-- Action / Camera Zone -->
@@ -63,16 +73,16 @@
                 Checking work for: <strong id="selectedNameDisplay"></strong>
             </div>
 
-            <button class="btn btn-scan" onclick="document.getElementById('cameraInput').click()">
+            <button class="btn btn-scan" id="btnScanPrompt" onclick="document.getElementById('cameraInput').click()">
                 📸 Scan Homework Page
             </button>
             <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="onFileSelected()">
 
             <!-- Preview thumbnail -->
             <div id="imagePreviewContainer" class="preview-container" style="display: none;">
-                <img id="imagePreview" alt="Worksheet Preview" class="preview-img">
+                <img id="imagePreview" alt="Preview" class="preview-img">
                 <div class="preview-actions">
-                    <button class="btn btn-confirm" id="btnSubmitGrade" onclick="uploadAndGrade()">✨ Check My Work!</button>
+                    <button class="btn btn-confirm" id="btnSubmitGrade" onclick="handleSubmitAction()">✨ Check My Work!</button>
                     <button class="btn btn-secondary" onclick="rotatePreview()" type="button">🔄 Rotate</button>
                     <button class="btn btn-secondary" onclick="resetScan()">Retake</button>
                 </div>
@@ -82,11 +92,61 @@
         <!-- Loading State -->
         <div id="loadingZone" class="loading-zone" style="display: none;">
             <div class="spinner"></div>
-            <h3>✨ Checking your Best Brains page...</h3>
-            <p>Our smart AI is reading your handwriting and calculations. Hold tight!</p>
+            <h3 id="loadingTitle">✨ Checking your Best Brains page...</h3>
+            <p id="loadingText">Our smart AI is reading your handwriting and calculations. Hold tight!</p>
         </div>
 
-        <!-- Feedback & Results -->
+        <!-- Book Comprehension Quiz Zone (Phase 3) -->
+        <section id="bookQuizZone" class="book-quiz-zone" style="display: none;">
+            <div class="book-quiz-card">
+                <div class="book-header-box">
+                    <span class="book-pill">📖 Book Found</span>
+                    <h2 id="bookTitleDisplay">...</h2>
+                    <span class="author-tag" id="bookAuthorDisplay">by Author</span>
+                    <div id="bookAlreadyReadBadge" style="display: none;" class="already-read-notice">⭐ You already mastered this book earlier!</div>
+                </div>
+
+                <div class="teacher-header" style="margin-top: 18px;">
+                    <div class="teacher-avatar">🦉</div>
+                    <div>
+                        <h3>Professor Sunny's Question</h3>
+                        <span class="teacher-tagline">Answer to earn +15 Reading Points!</span>
+                    </div>
+                </div>
+
+                <div class="chat-speech-bubble" id="bookQuestionBubble">
+                    "Loading your question..."
+                </div>
+
+                <div class="chat-controls">
+                    <button class="btn-mic" id="btnBookMic" onclick="toggleBookVoiceRecording()">
+                        <span id="bookMicIcon">🎙️</span> <span id="bookMicLabel">Tap to Answer</span>
+                    </button>
+                    <div class="chat-input-row">
+                        <input type="text" id="bookAnswerInput" placeholder="Or type your answer..." onkeydown="if(event.key==='Enter') submitBookAnswer()">
+                        <button class="btn-send-chat" id="btnSubmitBookAnswer" onclick="submitBookAnswer()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Book Result Feedback Card -->
+        <section id="bookResultZone" class="feedback-zone" style="display: none;">
+            <div id="bookResultCard" class="result-card"></div>
+        </section>
+
+        <!-- Virtual Bookshelf -->
+        <section id="bookshelfZone" class="bookshelf-zone" style="display: none;">
+            <div class="shelf-header">
+                <h3>🏆 <span id="shelfChildName"></span>'s Virtual Bookshelf</h3>
+                <span class="books-count-badge" id="booksCountBadge">0 books read</span>
+            </div>
+            <div class="shelf-grid" id="shelfGrid">
+                <!-- Book spines rendered here -->
+            </div>
+        </section>
+
+        <!-- Feedback & Results (Worksheets) -->
         <section id="feedbackZone" class="feedback-zone" style="display: none;">
             <div id="feedbackCard" class="result-card"></div>
 

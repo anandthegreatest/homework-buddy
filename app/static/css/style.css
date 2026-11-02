@@ -730,3 +730,187 @@ body {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* --- Phase 3: Bookworm Club & Bookshelf Styles --- */
+.mode-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 22px auto 0;
+    max-width: 400px;
+}
+
+.mode-tab {
+    flex: 1;
+    padding: 10px 18px;
+    border-radius: 24px;
+    border: 2px solid #e2e8f0;
+    background: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mode-tab:hover {
+    border-color: #cbd5e0;
+    transform: translateY(-2px);
+}
+
+.mode-tab.active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #1d4ed8;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+}
+
+.book-quiz-zone {
+    margin-top: 24px;
+    animation: fadeIn 0.3s ease;
+}
+
+.book-quiz-card {
+    background: #ffffff;
+    border: 2px solid #fde68a;
+    border-radius: 20px;
+    padding: 22px;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12);
+    text-align: left;
+}
+
+.book-header-box {
+    border-bottom: 2px dashed #fef3c7;
+    padding-bottom: 14px;
+}
+
+.book-pill {
+    display: inline-block;
+    background: #fef3c7;
+    color: #b45309;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.book-header-box h2 {
+    font-size: 22px;
+    color: #1e293b;
+    margin: 4px 0;
+}
+
+.author-tag {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.already-read-notice {
+    margin-top: 8px;
+    display: inline-block;
+    background: #ede9fe;
+    color: #6d28d9;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Virtual Bookshelf */
+.bookshelf-zone {
+    margin-top: 36px;
+    padding: 20px;
+    background: #fafaf9;
+    border: 2px solid #e7e5e4;
+    border-radius: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.shelf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.shelf-header h3 {
+    font-size: 18px;
+    color: #292524;
+    margin: 0;
+}
+
+.books-count-badge {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.shelf-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-start;
+}
+
+.shelf-empty-msg {
+    color: #78716c;
+    font-size: 14px;
+    font-style: italic;
+    padding: 10px 0;
+}
+
+.book-badge-card {
+    background: #ffffff;
+    border: 1px solid #d6d3d1;
+    border-left: 6px solid #f59e0b;
+    border-radius: 8px;
+    padding: 10px 14px;
+    width: calc(50% - 6px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    box-sizing: border-box;
+    text-align: left;
+    transition: transform 0.2s;
+}
+
+.book-badge-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.book-badge-card.color-0 { border-left-color: #3b82f6; }
+.book-badge-card.color-1 { border-left-color: #10b981; }
+.book-badge-card.color-2 { border-left-color: #8b5cf6; }
+.book-badge-card.color-3 { border-left-color: #ec4899; }
+.book-badge-card.color-4 { border-left-color: #f59e0b; }
+
+.badge-book-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1c1917;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.badge-book-author {
+    font-size: 12px;
+    color: #78716c;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.badge-book-pts {
+    font-size: 11px;
+    color: #059669;
+    font-weight: 700;
+    margin-top: 4px;
+}
