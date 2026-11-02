@@ -252,6 +252,35 @@ async def generate_speech(text: str, voice: Optional[str] = None):
         logger.error(f"TTS connection error: {e}")
         raise HTTPException(status_code=503, detail="TTS service unavailable")
 
+@app.post("/api/v1/stt")
+async def speech_to_text(audio: UploadFile = File(...)):
+    """
+    Transcribes audio recorded via MediaRecorder (e.g. from Safari iOS) using local Whisper container.
+    """
+    contents = await audio.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Audio recording is empty.")
+
+    filename = audio.filename or "recording.m4a"
+    content_type = audio.content_type or "audio/mp4"
+
+    try:
+        files = {"audio_file": (filename, contents, content_type)}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(
+                f"{settings.WHISPER_STT_URL}?task=transcribe&language=en&output=txt",
+                files=files
+            )
+            if res.status_code == 200:
+                transcript = res.text.strip()
+                return {"text": transcript}
+            else:
+                logger.error(f"Whisper STT returned status {res.status_code}: {res.text}")
+                raise HTTPException(status_code=502, detail="Whisper transcription failed.")
+    except Exception as e:
+        logger.error(f"Whisper STT connection error: {e}")
+        raise HTTPException(status_code=503, detail="Whisper STT service unavailable.")
+
 @app.post("/api/v1/teacher/chat", response_model=TeacherChatResponse)
 async def teacher_voice_chat(payload: TeacherChatRequest):
     """

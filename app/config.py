@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     KOKORO_TTS_URL: str = os.getenv("KOKORO_TTS_URL", "http://tts:8880/v1/audio/speech")
     KOKORO_VOICE: str = os.getenv("KOKORO_VOICE", "af_heart")
     
+    # Local Whisper Neural STT
+    WHISPER_STT_URL: str = os.getenv("WHISPER_STT_URL", "http://whisper:9000/asr")
+    
     # Grading rule settings
     POINTS_PER_CORRECT: int = 10
     POINTS_PER_STREAK: int = 2

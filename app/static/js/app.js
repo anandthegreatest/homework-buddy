@@ -656,24 +656,171 @@ function updateMicUI(recording) {
     }
 }
 
-function toggleVoiceRecording() {
-    stopSpeech();
-    if (!recognition) {
-        recognition = initSpeechRecognition();
-        if (!recognition) {
-            alert("Speech recognition isn't supported on this browser. You can type in the box below instead!");
+let mediaRecorderInstance = null;
+let audioChunks = [];
+let mediaStreamRef = null;
+
+async function recordAudioWithMediaRecorder(onSuccessCallback, onUIUpdate) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return false;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef = stream;
+        audioChunks = [];
+
+        let options = {};
+        if (typeof MediaRecorder.isTypeSupported === 'function') {
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                options = { mimeType: 'audio/mp4' };
+            } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/webm' };
+            }
+        }
+
+        mediaRecorderInstance = new MediaRecorder(stream, options);
+
+        mediaRecorderInstance.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                audioChunks.push(e.data);
+            }
+        };
+
+        mediaRecorderInstance.onstop = async () => {
+            if (mediaStreamRef) {
+                mediaStreamRef.getTracks().forEach(t => t.stop());
+                mediaStreamRef = null;
+            }
+
+            if (audioChunks.length === 0) {
+                onUIUpdate("idle");
+                return;
+            }
+
+            const mime = options.mimeType || 'audio/mp4';
+            const blob = new Blob(audioChunks, { type: mime });
+            const ext = mime.includes('webm') ? 'webm' : 'm4a';
+
+            onUIUpdate("transcribing");
+
+            try {
+                const formData = new FormData();
+                formData.append("audio", blob, `speech.${ext}`);
+
+                const res = await fetch(`${SERVER_URL}/api/v1/stt`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.text && data.text.trim()) {
+                        onSuccessCallback(data.text.trim());
+                    } else {
+                        alert("Could not catch that clearly. Please try speaking again!");
+                    }
+                } else {
+                    console.warn("STT server error:", res.status);
+                    alert("Speech transcription had an issue. You can type in the box below!");
+                }
+            } catch (err) {
+                console.error("Transcription error:", err);
+                alert("Speech transcription error: " + err.message);
+            } finally {
+                onUIUpdate("idle");
+            }
+        };
+
+        mediaRecorderInstance.start();
+        onUIUpdate("recording");
+        return true;
+    } catch (e) {
+        console.warn("MediaRecorder start failed:", e);
+        return false;
+    }
+}
+
+function handleSafariHttpGuidance() {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isHttp = window.location.protocol === 'http:' && window.location.hostname !== 'localhost';
+
+    if (isSafari && isHttp) {
+        const secureUrl = `https://${window.location.hostname}:8443`;
+        const switchNow = confirm(
+            "🍎 Safari / iPad Tip:\n\n" +
+            "Apple requires a Secure Connection (HTTPS) to unlock the microphone for websites.\n\n" +
+            "Tap OK to switch to Secure Mode (HTTPS) on port 8443!\n" +
+            "(Safari will ask you once to tap 'Show Details' -> 'visit this website' to allow your home network).\n\n" +
+            "Or tap Cancel to type your answer with your iPad keyboard mic!"
+        );
+        if (switchNow) {
+            window.location.href = secureUrl;
             return;
         }
     }
 
-    if (isRecording) {
+    alert("Speech recognition isn't supported on this connection. Tip: You can tap the text box and tap the microphone icon 🎙️ on your iPad keyboard to speak your answer!");
+}
+
+async function toggleVoiceRecording() {
+    stopSpeech();
+
+    // 1. If currently recording with MediaRecorder, stop and transcribe
+    if (mediaRecorderInstance && mediaRecorderInstance.state === "recording") {
+        mediaRecorderInstance.stop();
+        return;
+    }
+
+    // 2. If currently recording with Web Speech Recognition, stop it
+    if (recognition && isRecording) {
         recognition.stop();
-    } else {
+        return;
+    }
+
+    // 3. Try Web Speech API (Safari iOS on HTTPS or Chrome)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        if (!recognition) recognition = initSpeechRecognition();
         try {
             recognition.start();
+            return;
         } catch (e) {
-            console.warn("Recognition start issue:", e);
+            console.warn("Web Speech start error, trying MediaRecorder:", e);
         }
+    }
+
+    // 4. Try MediaRecorder + Whisper fallback
+    const started = await recordAudioWithMediaRecorder(
+        (transcript) => {
+            const input = document.getElementById('teacherTextInput');
+            if (input) input.value = transcript;
+            sendTeacherMessage(transcript);
+        },
+        (state) => {
+            const micBtn = document.getElementById('btnVoiceMic');
+            const micIcon = document.getElementById('micIcon');
+            const micLabel = document.getElementById('micLabel');
+            if (!micBtn) return;
+            if (state === "recording") {
+                micBtn.classList.add('recording');
+                if (micIcon) micIcon.innerText = "🛑";
+                if (micLabel) micLabel.innerText = "Listening... (Tap to Send)";
+            } else if (state === "transcribing") {
+                micBtn.classList.remove('recording');
+                if (micIcon) micIcon.innerText = "⏳";
+                if (micLabel) micLabel.innerText = "Transcribing...";
+            } else {
+                micBtn.classList.remove('recording');
+                if (micIcon) micIcon.innerText = "🎙️";
+                if (micLabel) micLabel.innerText = "Tap to Talk";
+            }
+        }
+    );
+
+    // 5. If both were blocked:
+    if (!started) {
+        handleSafariHttpGuidance();
     }
 }
 
@@ -1098,26 +1245,75 @@ function updateBookMicUI(recording) {
     }
 }
 
-function toggleBookVoiceRecording() {
+async function toggleBookVoiceRecording() {
     stopSpeech();
-    if (!bookRecognition) {
-        bookRecognition = initBookSpeechRecognition();
-        if (!bookRecognition) {
-            alert("Speech recognition isn't supported on this browser. You can type your answer in the box below!");
+
+    if (mediaRecorderInstance && mediaRecorderInstance.state === "recording") {
+        mediaRecorderInstance.stop();
+        return;
+    }
+
+    if (bookRecognition && isBookRecording) {
+        bookRecognition.stop();
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        if (!bookRecognition) bookRecognition = initBookSpeechRecognition();
+        try {
+            bookRecognition.start();
             return;
+        } catch (e) {
+            console.warn("Book Web Speech error, trying MediaRecorder:", e);
         }
     }
 
-    if (isBookRecording) {
-        bookRecognition.stop();
-    } else {
-        try {
-            bookRecognition.start();
-        } catch (e) {
-            console.warn("Book recognition start error:", e);
+    const started = await recordAudioWithMediaRecorder(
+        (transcript) => {
+            const input = document.getElementById('bookAnswerInput');
+            if (input) input.value = transcript;
+            submitBookAnswer();
+        },
+        (state) => {
+            const micBtn = document.getElementById('btnBookMic');
+            const micIcon = document.getElementById('bookMicIcon');
+            const micLabel = document.getElementById('bookMicLabel');
+            if (!micBtn) return;
+            if (state === "recording") {
+                micBtn.classList.add('recording');
+                if (micIcon) micIcon.innerText = "🛑";
+                if (micLabel) micLabel.innerText = "Listening... (Tap to Send)";
+            } else if (state === "transcribing") {
+                micBtn.classList.remove('recording');
+                if (micIcon) micIcon.innerText = "⏳";
+                if (micLabel) micLabel.innerText = "Transcribing...";
+            } else {
+                micBtn.classList.remove('recording');
+                if (micIcon) micIcon.innerText = "🎙️";
+                if (micLabel) micLabel.innerText = "Tap to Answer";
+            }
+        }
+    );
+
+    if (!started) {
+        handleSafariHttpGuidance();
+    }
+}
+
+function checkSafariHttpNotice() {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isHttp = window.location.protocol === 'http:' && window.location.hostname !== 'localhost';
+    if (isSafari && isHttp) {
+        const notice = document.getElementById('safariNotice');
+        const link = document.getElementById('safariHttpsLink');
+        if (notice && link) {
+            link.href = `https://${window.location.hostname}:8443`;
+            notice.style.display = 'block';
         }
     }
 }
 
 // Initial fetch on page load
 fetchPoints();
+checkSafariHttpNotice();
